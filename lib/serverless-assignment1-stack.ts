@@ -56,8 +56,27 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
         },
       });
 
+    //Lambda B
+    const addReviewFn = new lambdanode.NodejsFunction(
+      this,
+      "AddReviewFn",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_16_X,
+        entry: `${__dirname}/../lambdas/addReview.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: movieReviewsTable.tableName,
+          REGION: 'eu-west-1',
+        },
+      });
+
+
     // Permissions 
     movieReviewsTable.grantReadData(getAllReviewsFn);
+    movieReviewsTable.grantReadWriteData(addReviewFn);
+
 
     // REST API 
     const api = new apig.RestApi(this, "MovieReviewsAPI", {
@@ -73,15 +92,19 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
       },
     });
 
-
     //Endpoints
     const movies = api.root.addResource('movies');
     const movie = movies.addResource('{movieId}');
     const reviewsEndpoint = movie.addResource("reviews");
-    
+
     reviewsEndpoint.addMethod(
       "GET",
       new apig.LambdaIntegration(getAllReviewsFn, { proxy: true })
     );
+    reviewsEndpoint.addMethod(
+      "POST",
+      new apig.LambdaIntegration(addReviewFn, { proxy: true })
+    );
+
   }
 }
