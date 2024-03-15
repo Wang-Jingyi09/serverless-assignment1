@@ -1,6 +1,11 @@
 import { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import Ajv from "ajv";
+import schema from "../shared/types.schema.json";
+
+const ajv = new Ajv();
+const isValidBodyParams = ajv.compile(schema.definitions["MovieReview"] || {});
 
 const ddbDocClient = createDDbDocClient();
 
@@ -8,7 +13,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     try {
         // Print Event
         console.log("Event: ", event);
-        const movieIdString = event.pathParameters?.movieId; 
+        const movieIdString = event.pathParameters?.movieId;
         const movieId = movieIdString ? parseInt(movieIdString) : null;
 
         if (movieId === null || isNaN(movieId)) {
@@ -20,27 +25,29 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
         }
 
         const body = event.body ? JSON.parse(event.body) : undefined;
-        if (!body) {
+
+        if (!body || !isValidBodyParams(body)) { // Validate request body against schema
             return {
                 statusCode: 400,
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ message: "Missing request body" }),
-            };
-        }
-        // 检查是否有必要的字段
-        if (!body.ReviewerName || !body.Content || typeof body.Rating !== 'number') {
-            return {
-                statusCode: 400,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "Missing required fields in request body" }),
+                body: JSON.stringify({ message: "Invalid request body or missing request body" }),
             };
         }
 
-        // 将当前日期作为 ReviewDate
-        const reviewDate = new Date().toISOString().split('T')[0]; // 用 YYYY-MM-DD 格式
+        // if (!body.ReviewerName || !body.Content || typeof body.Rating !== 'number') {
+        //     return {
+        //         statusCode: 400,
+        //         headers: { "Content-Type": "application/json" },
+        //         body: JSON.stringify({ message: "Missing required fields in request body" }),
+        //     };
+        // }
 
+
+        const reviewDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+        
+    
         const commandOutput = await ddbDocClient.send(
             new PutCommand({
                 TableName: process.env.TABLE_NAME,
