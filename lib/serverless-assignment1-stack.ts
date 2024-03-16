@@ -128,11 +128,28 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
         },
       });
 
+      //extend Lambda C
+      const getReviewByMovieAndYearFn = new lambdanode.NodejsFunction(
+        this,
+        "GetReviewByMovieAndYearFn",
+        {
+          architecture: lambda.Architecture.ARM_64,
+          runtime: lambda.Runtime.NODEJS_16_X,
+          entry: `${__dirname}/../lambdas/getReviewByMovieAndYear.ts`,
+          timeout: cdk.Duration.seconds(10),
+          memorySize: 128,
+          environment: {
+            TABLE_NAME: movieReviewsTable.tableName,
+            REGION: 'eu-west-1',
+          },
+        });
 
     // Permissions 
-    movieReviewsTable.grantReadData(getAllReviewsFn);
-    movieReviewsTable.grantReadWriteData(addReviewFn);
-    movieReviewsTable.grantReadData(getReviewByReviewerFn);
+    movieReviewsTable.grantReadData(getAllReviewsFn); //A
+    movieReviewsTable.grantReadWriteData(addReviewFn);//B
+    movieReviewsTable.grantReadData(getReviewByReviewerFn);//C
+    movieReviewsTable.grantReadData(getReviewByMovieAndYearFn); //C PLUS
+
 
     // REST API 
     const api = new apig.RestApi(this, "MovieReviewsAPI", {
@@ -166,6 +183,7 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
       "GET",
       new apig.LambdaIntegration(getReviewByReviewerFn, { proxy: true })
     );
+    
 
   }// end constructor
 
