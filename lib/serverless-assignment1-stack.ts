@@ -24,6 +24,17 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
       tableName: "MovieReviews",
     });
 
+    //GSI to ensure:
+    //A movie will never have more than one review with the same date.
+    //A reviewer will never review a movie more than once.
+    movieReviewsTable.addGlobalSecondaryIndex({
+      indexName: "ReviewIndex",
+      partitionKey: { name: 'ReviewerName', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'MovieId', type: dynamodb.AttributeType.NUMBER },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+
     new custom.AwsCustomResource(this, "reviewsddbInitData", {
       onCreate: {
         service: "DynamoDB",
@@ -40,7 +51,7 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
       }),
     });
 
-    //Lambda A
+    // Lambda A
     const getAllReviewsFn = new lambdanode.NodejsFunction(
       this,
       "GetAllReviewsFn",
@@ -56,7 +67,7 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
         },
       });
 
-    //Lambda B
+    // Lambda B
     const addReviewFn = new lambdanode.NodejsFunction(
       this,
       "AddReviewFn",
@@ -72,11 +83,27 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
         },
       });
 
+    // Lambda C
+    const getReviewByReviewerFn = new lambdanode.NodejsFunction(
+      this,
+      "GetReviewByReviewerFn",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_16_X,
+        entry: `${__dirname}/../lambdas/getReviewByReviewer.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: movieReviewsTable.tableName,
+          REGION: 'eu-west-1',
+        },
+      });
+
 
     // Permissions 
     movieReviewsTable.grantReadData(getAllReviewsFn);
     movieReviewsTable.grantReadWriteData(addReviewFn);
-
+    movieReviewsTable.grantReadData(getReviewByReviewerFn);
 
     // REST API 
     const api = new apig.RestApi(this, "MovieReviewsAPI", {
@@ -96,6 +123,7 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
     const movies = api.root.addResource('movies');
     const movie = movies.addResource('{movieId}');
     const reviewsEndpoint = movie.addResource("reviews");
+    const reviewerEndpoint = reviewsEndpoint.addResource("{reviewerName}");
 
     reviewsEndpoint.addMethod(
       "GET",
@@ -104,6 +132,10 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
     reviewsEndpoint.addMethod(
       "POST",
       new apig.LambdaIntegration(addReviewFn, { proxy: true })
+    );
+    reviewerEndpoint.addMethod(
+      "GET",
+      new apig.LambdaIntegration(getReviewByReviewerFn, { proxy: true })
     );
 
   }
