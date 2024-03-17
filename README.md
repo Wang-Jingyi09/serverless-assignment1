@@ -2,7 +2,7 @@
 
 __Name:__ Jingyi Wang
 
-__Video demonstration:__ https://youtu.be/cPleXS3T17Y
+__Video demonstration:__ https://youtu.be/5N6OzRdBL3U
 
 This repository contains an implementation of a serverless REST API for the AWS platform. The CDK framework is used to provision its infrastructure. The API's domain context is movie reviews.
 
