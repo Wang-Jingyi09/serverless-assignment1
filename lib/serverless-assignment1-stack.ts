@@ -47,17 +47,23 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
     // create DynamoDB table
     const movieReviewsTable = new dynamodb.Table(this, 'MovieReviews', {
       partitionKey: { name: 'MovieId', type: dynamodb.AttributeType.NUMBER },
-      sortKey: { name: 'ReviewDate', type: dynamodb.AttributeType.STRING },  // ensure a movie will have no or only one review with the same date. 
+      sortKey: { name: 'ReviewerName', type: dynamodb.AttributeType.STRING },  // ensure a movie will have no or only one review with the same date. 
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       tableName: "MovieReviews",
     });
 
-    //GSI to ensure:
-    //A movie will never have more than one review with the same date.
-    //A reviewer will never review a movie more than once.
+    // GSI for ensuring a movie never has more than one review on the same date
     movieReviewsTable.addGlobalSecondaryIndex({
-      indexName: "ReviewIndex",
+      indexName: "MovieDateIndex",
+      partitionKey: { name: 'MovieId', type: dynamodb.AttributeType.NUMBER },
+      sortKey: { name: 'ReviewDate', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI for ensuring a reviewer never reviews a movie more than once
+    movieReviewsTable.addGlobalSecondaryIndex({
+      indexName: "ReviewerMovieIndex",
       partitionKey: { name: 'ReviewerName', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'MovieId', type: dynamodb.AttributeType.NUMBER },
       projectionType: dynamodb.ProjectionType.ALL,
@@ -128,37 +134,53 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
         },
       });
 
-      //extend Lambda C
-      const getReviewByMovieAndYearFn = new lambdanode.NodejsFunction(
-        this,
-        "GetReviewByMovieAndYearFn",
-        {
-          architecture: lambda.Architecture.ARM_64,
-          runtime: lambda.Runtime.NODEJS_16_X,
-          entry: `${__dirname}/../lambdas/getReviewByMovieAndYear.ts`,
-          timeout: cdk.Duration.seconds(10),
-          memorySize: 128,
-          environment: {
-            TABLE_NAME: movieReviewsTable.tableName,
-            REGION: 'eu-west-1',
-          },
-        });
+    //extend Lambda C
+    const getReviewByMovieAndYearFn = new lambdanode.NodejsFunction(
+      this,
+      "GetReviewByMovieAndYearFn",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_16_X,
+        entry: `${__dirname}/../lambdas/getReviewByMovieAndYear.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: movieReviewsTable.tableName,
+          REGION: 'eu-west-1',
+        },
+      });
 
-        //Lambda D
-        const getAllReviewsByReviewerFn = new lambdanode.NodejsFunction(
-          this,
-          "GetAllReviewsByReviewerFn",
-          {
-            architecture: lambda.Architecture.ARM_64,
-            runtime: lambda.Runtime.NODEJS_16_X,
-            entry: `${__dirname}/../lambdas/getAllReviewsByReviewer.ts`,
-            timeout: cdk.Duration.seconds(10),
-            memorySize: 128,
-            environment: {
-              TABLE_NAME: movieReviewsTable.tableName,
-              REGION: 'eu-west-1',
-            },
-          });
+    //Lambda D
+    const getAllReviewsByReviewerFn = new lambdanode.NodejsFunction(
+      this,
+      "GetAllReviewsByReviewerFn",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_16_X,
+        entry: `${__dirname}/../lambdas/getAllReviewsByReviewer.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: movieReviewsTable.tableName,
+          REGION: 'eu-west-1',
+        },
+      });
+
+    //Lambda E
+    const updateReviewFn = new lambdanode.NodejsFunction(
+      this,
+      "UpdateReviewFn ",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_16_X,
+        entry: `${__dirname}/../lambdas/updateReview.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: movieReviewsTable.tableName,
+          REGION: 'eu-west-1',
+        },
+      });
 
     // Permissions 
     movieReviewsTable.grantReadData(getAllReviewsFn); //A
@@ -166,6 +188,7 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
     movieReviewsTable.grantReadData(getReviewByReviewerFn);//C
     movieReviewsTable.grantReadData(getReviewByMovieAndYearFn); //C PLUS
     movieReviewsTable.grantReadData(getAllReviewsByReviewerFn); // D
+    movieReviewsTable.grantWriteData(updateReviewFn); // E
 
 
     // REST API 
@@ -203,10 +226,14 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
       new apig.LambdaIntegration(getReviewByReviewerFn, { proxy: true })
     );
     reviewerReviews.addMethod(
-      'GET', 
-      new apig.LambdaIntegration(getAllReviewsByReviewerFn, { proxy: true }));
+      'GET',
+      new apig.LambdaIntegration(getAllReviewsByReviewerFn, { proxy: true })
+    );
+    reviewerEndpoint.addMethod(
+      "PUT",
+      new apig.LambdaIntegration(updateReviewFn, { proxy: true })
+    );
 
-    
 
   }// end constructor
 

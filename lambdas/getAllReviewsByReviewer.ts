@@ -16,7 +16,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
     const params = {
         TableName: process.env.TABLE_NAME,
-        IndexName: 'ReviewIndex',
+        IndexName: 'ReviewerMovieIndex',
         KeyConditionExpression: 'ReviewerName = :reviewerName',
         ExpressionAttributeValues: {
             ':reviewerName': reviewerName
@@ -34,6 +34,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
         };
     } catch (error) {
         console.error('Error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+
         return {
             statusCode: 500,
             headers: {
@@ -41,7 +43,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
             },
             body: JSON.stringify({
                 message: 'Internal Server Error',
-                error: error
+                error: errorMessage
             })
         };
     }

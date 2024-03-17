@@ -21,7 +21,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
         const commandOutput = await ddbDocClient.send(
             new QueryCommand({
                 TableName: process.env.TABLE_NAME, 
-                IndexName: 'ReviewIndex', 
+                IndexName: 'ReviewerMovieIndex', 
                 KeyConditionExpression:
                     'ReviewerName = :reviewerName and MovieId = :movieId',
                 ExpressionAttributeValues: {
@@ -37,7 +37,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ message: "No review found for this movie and reviewer" }),
+                body: JSON.stringify({ 
+                    message: "No review found for this movie and reviewer" 
+                }),
             };
         }
 

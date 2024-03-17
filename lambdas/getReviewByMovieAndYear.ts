@@ -38,6 +38,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     // DynamoDB query for reviews within the specified year for the specified movie
     const params = {
         TableName: process.env.TABLE_NAME,
+        IndexName: "MovieDateIndex",
         KeyConditionExpression: "MovieId = :movieId and ReviewDate BETWEEN :startDate AND :endDate",
         ExpressionAttributeValues: {
             ":movieId": movieId,
@@ -51,15 +52,21 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
         return {
             statusCode: 200,
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: JSON.stringify({ reviews: Items }),
         };
     } catch (err) {
         console.error("DynamoDB error: ", err);
         return {
             statusCode: 500,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: "Internal server error" }),
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                message: "Internal server error"
+            }),
         };
     }
 };
