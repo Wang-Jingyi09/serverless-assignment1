@@ -182,6 +182,24 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
         },
       });
 
+    // Lambda F
+    const translateReviewFn = new lambdanode.NodejsFunction(
+      this,
+      "TranslateReviewFn ",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_16_X,
+        entry: `${__dirname}/../lambdas/translateReview.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: movieReviewsTable.tableName,
+          REGION: 'eu-west-1',
+        },
+      });
+
+
+
     // Permissions 
     movieReviewsTable.grantReadData(getAllReviewsFn); //A
     movieReviewsTable.grantReadWriteData(addReviewFn);//B
@@ -189,6 +207,7 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
     movieReviewsTable.grantReadData(getReviewByMovieAndYearFn); //C PLUS
     movieReviewsTable.grantReadData(getAllReviewsByReviewerFn); // D
     movieReviewsTable.grantWriteData(updateReviewFn); // E
+    movieReviewsTable.grantReadData(translateReviewFn);
 
 
     // REST API 
@@ -206,12 +225,14 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
     });
 
     //Endpoints
-    const movies = api.root.addResource('movies');
-    const reviewsResource = api.root.addResource('reviews');
-    const movie = movies.addResource('{movieId}');
-    const reviewsEndpoint = movie.addResource("reviews");
-    const reviewerEndpoint = reviewsEndpoint.addResource("{reviewerName}");
-    const reviewerReviews = reviewsResource.addResource('{reviewerName}');
+    const movies = api.root.addResource('movies');//
+    const reviewsResource = api.root.addResource('reviews');//F
+    const movie = movies.addResource('{movieId}');//
+    const reviewsEndpoint = movie.addResource("reviews");//
+    const reviewerEndpoint = reviewsEndpoint.addResource("{reviewerName}");//
+    const reviewerReviews = reviewsResource.addResource('{reviewerName}');//F
+    const movieEndpoint = reviewerReviews.addResource('{movieId}');//F
+    const translationEndpoint = movieEndpoint.addResource('translation');//F
 
     reviewsEndpoint.addMethod(
       "GET",
@@ -232,6 +253,10 @@ export class ServerlessAssignment1Stack extends cdk.Stack {
     reviewerEndpoint.addMethod(
       "PUT",
       new apig.LambdaIntegration(updateReviewFn, { proxy: true })
+    );
+    translationEndpoint.addMethod(
+      'GET',
+      new apig.LambdaIntegration(translateReviewFn, { proxy: true })
     );
 
 
